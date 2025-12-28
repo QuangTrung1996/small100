@@ -16,6 +16,7 @@ export default function JoinRoomPage() {
   const navigate = useNavigate();
   const {
     settings,
+    saveSettings,
     setUserId,
     setConnected,
     setRoom,
@@ -54,6 +55,11 @@ export default function JoinRoomPage() {
           languageRef.current
         );
       } else if (isRoomJoinedMessage(message)) {
+        // Save selected language to settings
+        saveSettings({
+          userName: userNameRef.current,
+          language: languageRef.current,
+        });
         setRoom(message.room);
         setMembers(message.members);
         setMessages(message.messages || []);
@@ -64,7 +70,15 @@ export default function JoinRoomPage() {
         setIsLoading(false);
       }
     },
-    [navigate, setUserId, setConnected, setRoom, setMembers, setMessages]
+    [
+      navigate,
+      setUserId,
+      setConnected,
+      setRoom,
+      setMembers,
+      setMessages,
+      saveSettings,
+    ]
   );
 
   const handleConnectionChange = useCallback(

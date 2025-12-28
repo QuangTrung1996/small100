@@ -14,8 +14,15 @@ import LanguageSelector from "../components/LanguageSelector";
 
 export default function CreateRoomPage() {
   const navigate = useNavigate();
-  const { settings, setUserId, setConnected, setRoom, setMembers, clearRoom } =
-    useAppStore();
+  const {
+    settings,
+    saveSettings,
+    setUserId,
+    setConnected,
+    setRoom,
+    setMembers,
+    clearRoom,
+  } = useAppStore();
 
   const [roomName, setRoomName] = useState("");
   const [hostName, setHostName] = useState(settings.userName || "");
@@ -73,6 +80,11 @@ export default function CreateRoomPage() {
         );
       } else if (isRoomCreatedMessage(message)) {
         addLog("🏠 Room created successfully");
+        // Save selected language to settings
+        saveSettings({
+          userName: hostNameRef.current,
+          language: languageRef.current,
+        });
         setRoom(message.room);
         setMembers(message.members);
         setIsLoading(false);
@@ -83,7 +95,15 @@ export default function CreateRoomPage() {
         setIsLoading(false);
       }
     },
-    [navigate, setUserId, setConnected, setRoom, setMembers, addLog]
+    [
+      navigate,
+      setUserId,
+      setConnected,
+      setRoom,
+      setMembers,
+      addLog,
+      saveSettings,
+    ]
   );
 
   const handleConnectionChange = useCallback(

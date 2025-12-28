@@ -90,6 +90,8 @@ export class Translator {
 
   /**
    * Translate text to target language
+   * SMALL100 format: encoder input = [tgt_lang_code] + src_tokens + [EOS]
+   *                  decoder input starts with [EOS, tgt_lang_code]
    */
   async translate(text: string, targetLanguage: string): Promise<string> {
     const startTime = performance.now();
@@ -101,22 +103,28 @@ export class Translator {
     }
 
     if (this.config.logSteps) {
-      console.log(`[Translate] Text: "${text}" -> ${targetLanguage}`);
+      console.log(
+        `[Translate] Text: "${text}" -> ${targetLanguage} (lang token: ${langTokenId})`
+      );
     }
 
     // Tokenize input
     const inputTokens = this.tokenizer.encode(text);
-    const inputIds = [...inputTokens, this.tokenizer.eosTokenId];
+
+    // SMALL100 format: [tgt_lang_code] + src_tokens + [EOS]
+    const inputIds = [langTokenId, ...inputTokens, this.tokenizer.eosTokenId];
     const attentionMask = inputIds.map(() => 1);
 
     if (this.config.logSteps) {
-      console.log(`[Translate] Input tokens: ${inputIds.length}`);
+      console.log(
+        `[Translate] Input tokens: ${inputIds.length} (including lang token)`
+      );
     }
 
     // Run encoder
     await this.engine.encode(inputIds, attentionMask);
 
-    // Initialize decoder with language token
+    // Initialize decoder with [EOS, tgt_lang_code]
     const initialIds = [this.tokenizer.eosTokenId, langTokenId];
 
     // Run beam search
