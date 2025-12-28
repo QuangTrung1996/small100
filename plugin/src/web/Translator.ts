@@ -46,13 +46,14 @@ export class Translator {
     const engine = await TranslationEngine.create(encoderData, decoderData);
 
     const decoderConfig: Partial<BeamSearchConfig> = {
-      numBeams: config.numBeams ?? 5,
+      numBeams: config.numBeams ?? 2, // Reduced for speed
       maxLength: config.maxLength ?? 200,
       lengthPenalty: config.lengthPenalty ?? 1.0,
-      repetitionPenalty: config.repetitionPenalty ?? 1.2,
-      noRepeatNgramSize: config.noRepeatNgramSize ?? 3,
+      repetitionPenalty: config.repetitionPenalty ?? 1.0, // Reduced for accuracy
+      noRepeatNgramSize: config.noRepeatNgramSize ?? 0, // Disabled for accuracy
       eosTokenId: tokenizer.eosTokenId,
       padTokenId: tokenizer.padTokenId,
+      useGreedyDecode: (config as any).useGreedyDecode ?? false,
     };
 
     const decoder = new BeamSearchDecoder(decoderConfig);
@@ -111,6 +112,15 @@ export class Translator {
     // Tokenize input
     const inputTokens = this.tokenizer.encode(text);
 
+    // DEBUG: Log tokenization details
+    console.log(`[Translate] Input text: "${text}"`);
+    console.log(`[Translate] Tokenized: [${inputTokens.join(", ")}]`);
+    console.log(
+      `[Translate] Token strings: ${inputTokens
+        .map((id) => this.tokenizer.decodeToken(id))
+        .join(" | ")}`
+    );
+
     // SMALL100 format: [tgt_lang_code] + src_tokens + [EOS]
     const inputIds = [langTokenId, ...inputTokens, this.tokenizer.eosTokenId];
     const attentionMask = inputIds.map(() => 1);
@@ -130,6 +140,14 @@ export class Translator {
     // Run beam search
     const outputIds = await this.decoder.decode(initialIds, (batch) =>
       this.engine.getNextLogits(batch)
+    );
+
+    // DEBUG: Log output tokens
+    console.log(`[Translate] Output IDs: [${outputIds.join(", ")}]`);
+    console.log(
+      `[Translate] Output tokens: ${outputIds
+        .map((id) => this.tokenizer.decodeToken(id))
+        .join(" | ")}`
     );
 
     // Decode output

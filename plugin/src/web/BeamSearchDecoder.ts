@@ -11,6 +11,7 @@ export interface BeamSearchConfig {
   noRepeatNgramSize: number;
   eosTokenId: number;
   padTokenId: number;
+  useGreedyDecode?: boolean; // Fast mode: skip beam search
 }
 
 export interface Beam {
@@ -28,14 +29,75 @@ export class BeamSearchDecoder {
 
   constructor(config: Partial<BeamSearchConfig> = {}) {
     this.config = {
-      numBeams: config.numBeams ?? 5,
+      numBeams: config.numBeams ?? 2, // Reduced from 5 for speed
       maxLength: config.maxLength ?? 200,
       lengthPenalty: config.lengthPenalty ?? 1.0,
-      repetitionPenalty: config.repetitionPenalty ?? 1.2,
-      noRepeatNgramSize: config.noRepeatNgramSize ?? 3,
+      repetitionPenalty: config.repetitionPenalty ?? 1.0, // Reduced from 1.2 for accuracy
+      noRepeatNgramSize: config.noRepeatNgramSize ?? 0, // Disabled for accuracy
       eosTokenId: config.eosTokenId ?? 2,
       padTokenId: config.padTokenId ?? 1,
+      useGreedyDecode: config.useGreedyDecode ?? false,
     };
+  }
+
+  /**
+   * Fast greedy decode - single beam, no search
+   */
+  async greedyDecode(
+    initialTokenIds: number[],
+    getNextLogits: GetNextLogitsCallback
+  ): Promise<number[]> {
+    const { maxLength, eosTokenId, padTokenId } = this.config;
+    const tokenIds = [...initialTokenIds];
+
+    console.log(
+      `[GreedyDecode] Starting with initial: [${initialTokenIds.join(", ")}]`
+    );
+
+    for (let step = 0; step < maxLength; step++) {
+      const [logits] = await getNextLogits([tokenIds]);
+
+      // Find top 5 for debugging
+      const top5: { idx: number; val: number }[] = [];
+      for (let i = 0; i < logits.length; i++) {
+        if (top5.length < 5) {
+          top5.push({ idx: i, val: logits[i] });
+          top5.sort((a, b) => b.val - a.val);
+        } else if (logits[i] > top5[4].val) {
+          top5[4] = { idx: i, val: logits[i] };
+          top5.sort((a, b) => b.val - a.val);
+        }
+      }
+
+      // Find argmax
+      let maxIdx = 0;
+      let maxVal = logits[0];
+      for (let i = 1; i < logits.length; i++) {
+        if (logits[i] > maxVal) {
+          maxVal = logits[i];
+          maxIdx = i;
+        }
+      }
+
+      if (step < 5) {
+        console.log(
+          `[GreedyDecode] Step ${step}: Top5 = [${top5
+            .map((t) => `${t.idx}:${t.val.toFixed(2)}`)
+            .join(", ")}] → Selected: ${maxIdx}`
+        );
+      }
+
+      if (maxIdx === eosTokenId) {
+        console.log(`[GreedyDecode] Finished at step ${step} with EOS`);
+        break;
+      }
+      tokenIds.push(maxIdx);
+    }
+
+    let result = tokenIds.slice(initialTokenIds.length);
+    result = result.filter((id) => id !== eosTokenId && id !== padTokenId);
+    console.log(`[GreedyDecode] Final output: [${result.join(", ")}]`);
+    return result;
   }
 
   /**
@@ -45,6 +107,11 @@ export class BeamSearchDecoder {
     initialTokenIds: number[],
     getNextLogits: GetNextLogitsCallback
   ): Promise<number[]> {
+    // Use greedy decode if configured for speed
+    if (this.config.useGreedyDecode) {
+      return this.greedyDecode(initialTokenIds, getNextLogits);
+    }
+
     const { numBeams, maxLength, eosTokenId, padTokenId } = this.config;
 
     // Initialize beams

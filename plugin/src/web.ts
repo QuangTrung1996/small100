@@ -209,11 +209,21 @@ export class Small100OnnxTranslatorWeb
       throw new Error("Model files not found. Call downloadModels() first.");
     }
 
+    // Optimized config for faster translation
     this.translator = await Translator.create(
       encoder,
       decoder,
       vocab,
-      addedTokens
+      addedTokens,
+      {
+        numBeams: 2, // Reduced for speed (was 5)
+        maxLength: 150, // Reduced for speed (was 200)
+        repetitionPenalty: 1.0, // Disabled for accuracy (was 1.2)
+        noRepeatNgramSize: 0, // Disabled for accuracy (was 3)
+        lengthPenalty: 1.0,
+        logSteps: true, // Enable logging for debug
+        useGreedyDecode: true, // Use greedy for speed + debug
+      }
     );
   }
 

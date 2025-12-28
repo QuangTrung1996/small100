@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Translation Debug Test</title>
+    <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/ort.min.js"></script>
+    <style>
+      body {
+        font-family: monospace;
+        padding: 20px;
+        background: #1e1e1e;
+        color: #fff;
+      }
+      .log {
+        white-space: pre-wrap;
+        background: #2d2d2d;
+        padding: 10px;
+        margin: 5px 0;
+        border-radius: 4px;
+      }
+      .error {
+        color: #ff6b6b;
+      }
+      .success {
+        color: #69db7c;
+      }
+      button {
+        padding: 10px 20px;
+        margin: 5px;
+        cursor: pointer;
+      }
+      input,
+      select {
+        padding: 8px;
+        margin: 5px;
+        width: 300px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>🔍 Translation Debug Test</h1>
+
+    <div>
+      <input
+        type="text"
+        id="inputText"
+        value="こんにちは"
+        placeholder="Enter text..."
+      />
+      <select id="targetLang">
+        <option value="vi">Vietnamese (vi)</option>
+        <option value="en">English (en)</option>
+        <option value="ja">Japanese (ja)</option>
+      </select>
+      <button onclick="runTranslation()">Translate</button>
+      <button onclick="clearLogs()">Clear Logs</button>
+    </div>
+
+    <div id="status">Loading plugin...</div>
+    <div id="logs"></div>
+
+    <script type="module">
+      import { Small100OnnxTranslator } from "./dist/plugin.js";
+
+      // Intercept console.log
+      const logs = document.getElementById("logs");
+      const originalLog = console.log;
+      console.log = (...args) => {
+        originalLog(...args);
+        const div = document.createElement("div");
+        div.className = "log";
+        div.textContent = args
+          .map((a) => (typeof a === "object" ? JSON.stringify(a) : a))
+          .join(" ");
+        logs.appendChild(div);
+        logs.scrollTop = logs.scrollHeight;
+      };
+
+      const originalError = console.error;
+      console.error = (...args) => {
+        originalError(...args);
+        const div = document.createElement("div");
+        div.className = "log error";
+        div.textContent =
+          "❌ " +
+          args
+            .map((a) => (typeof a === "object" ? JSON.stringify(a) : a))
+            .join(" ");
+        logs.appendChild(div);
+      };
+
+      window.clearLogs = () => {
+        logs.innerHTML = "";
+      };
+
+      // Initialize
+      const status = document.getElementById("status");
+
+      try {
+        status.textContent = "⏳ Initializing translator...";
+        const info = await Small100OnnxTranslator.initialize();
+        status.textContent = `✅ Initialized: ${info.version}`;
+        console.log("Model info:", info);
+      } catch (e) {
+        status.textContent = "❌ Failed to initialize";
+        console.error(e);
+      }
+
+      window.runTranslation = async () => {
+        const text = document.getElementById("inputText").value;
+        const targetLang = document.getElementById("targetLang").value;
+
+        console.log(`\n========== TRANSLATING ==========`);
+        console.log(`Input: "${text}"`);
+        console.log(`Target: ${targetLang}`);
+
+        try {
+          const start = performance.now();
+          const result = await Small100OnnxTranslator.translate({
+            text,
+            sourceLanguage: "auto",
+            targetLanguage: targetLang,
+          });
+          const elapsed = performance.now() - start;
+
+          console.log(
+            `✅ Result: "${result.translatedText}" (${elapsed.toFixed(0)}ms)`
+          );
+        } catch (e) {
+          console.error("Translation failed:", e);
+        }
+      };
+    </script>
+  </body>
+</html>
