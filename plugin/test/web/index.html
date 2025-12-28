@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Small100 ONNX Translator - Test</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      padding: 20px;
+    }
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    h1 {
+      color: white;
+      text-align: center;
+      margin-bottom: 20px;
+      font-size: 1.8em;
+    }
+    .card {
+      background: white;
+      border-radius: 16px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+      padding: 24px;
+      margin-bottom: 20px;
+    }
+    .status {
+      padding: 12px 16px;
+      border-radius: 8px;
+      margin-bottom: 16px;
+      font-weight: 500;
+    }
+    .status.loading { background: #fff3cd; color: #856404; }
+    .status.ready { background: #d4edda; color: #155724; }
+    .status.error { background: #f8d7da; color: #721c24; }
+    
+    .form-group {
+      margin-bottom: 16px;
+    }
+    label {
+      display: block;
+      font-weight: 600;
+      margin-bottom: 6px;
+      color: #333;
+    }
+    select, textarea, input {
+      width: 100%;
+      padding: 12px;
+      border: 2px solid #e0e0e0;
+      border-radius: 8px;
+      font-size: 16px;
+      transition: border-color 0.2s;
+    }
+    select:focus, textarea:focus, input:focus {
+      outline: none;
+      border-color: #667eea;
+    }
+    textarea {
+      resize: vertical;
+      min-height: 100px;
+    }
+    .row {
+      display: flex;
+      gap: 12px;
+    }
+    .row .form-group {
+      flex: 1;
+    }
+    button {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      padding: 14px 28px;
+      font-size: 16px;
+      font-weight: 600;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    button:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 20px rgba(102, 126, 234, 0.4);
+    }
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+    .result {
+      background: #f8f9fa;
+      border-radius: 8px;
+      padding: 16px;
+      margin-top: 16px;
+      border-left: 4px solid #667eea;
+    }
+    .result-label {
+      font-size: 12px;
+      text-transform: uppercase;
+      color: #666;
+      margin-bottom: 8px;
+    }
+    .result-text {
+      font-size: 18px;
+      color: #333;
+      line-height: 1.5;
+    }
+    .log {
+      background: #1a1a2e;
+      color: #0f0;
+      font-family: 'Monaco', 'Consolas', monospace;
+      padding: 16px;
+      border-radius: 8px;
+      max-height: 300px;
+      overflow-y: auto;
+      font-size: 12px;
+      line-height: 1.6;
+    }
+    .log-entry { margin-bottom: 4px; }
+    .log-time { color: #888; }
+    .log-info { color: #6cf; }
+    .log-success { color: #6f6; }
+    .log-error { color: #f66; }
+    
+    .test-cases {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 12px;
+      margin-top: 16px;
+    }
+    .test-btn {
+      padding: 10px;
+      font-size: 14px;
+      background: #f0f0f0;
+      color: #333;
+    }
+    .test-btn:hover:not(:disabled) {
+      background: #e0e0e0;
+      transform: none;
+      box-shadow: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🌐 Small100 ONNX Translator Test</h1>
+    
+    <div class="card">
+      <div id="status" class="status loading">⏳ Initializing...</div>
+      
+      <div class="form-group">
+        <label>Source Text</label>
+        <textarea id="inputText" placeholder="Enter text to translate...">Xin chào, tôi là một trợ lý AI.</textarea>
+      </div>
+      
+      <div class="row">
+        <div class="form-group">
+          <label>Source Language</label>
+          <select id="srcLang">
+            <option value="auto">Auto Detect</option>
+            <option value="vi" selected>Vietnamese (vi)</option>
+            <option value="en">English (en)</option>
+            <option value="ja">Japanese (ja)</option>
+            <option value="ko">Korean (ko)</option>
+            <option value="zh">Chinese (zh)</option>
+            <option value="fr">French (fr)</option>
+            <option value="de">German (de)</option>
+            <option value="es">Spanish (es)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Target Language</label>
+          <select id="tgtLang">
+            <option value="en" selected>English (en)</option>
+            <option value="vi">Vietnamese (vi)</option>
+            <option value="ja">Japanese (ja)</option>
+            <option value="ko">Korean (ko)</option>
+            <option value="zh">Chinese (zh)</option>
+            <option value="fr">French (fr)</option>
+            <option value="de">German (de)</option>
+            <option value="es">Spanish (es)</option>
+          </select>
+        </div>
+      </div>
+      
+      <button id="translateBtn" disabled>Translate</button>
+      
+      <div id="resultBox" class="result" style="display: none;">
+        <div class="result-label">Translation Result</div>
+        <div id="resultText" class="result-text"></div>
+        <div id="resultTime" style="font-size: 12px; color: #888; margin-top: 8px;"></div>
+      </div>
+    </div>
+    
+    <div class="card">
+      <label>Quick Tests</label>
+      <div class="test-cases">
+        <button class="test-btn" onclick="runTest('Hello, how are you?', 'en', 'vi')">EN → VI</button>
+        <button class="test-btn" onclick="runTest('Xin chào thế giới', 'vi', 'en')">VI → EN</button>
+        <button class="test-btn" onclick="runTest('Xin chào thế giới', 'vi', 'ja')">VI → JA</button>
+        <button class="test-btn" onclick="runTest('こんにちは世界', 'ja', 'en')">JA → EN</button>
+        <button class="test-btn" onclick="runTest('Bonjour le monde', 'fr', 'en')">FR → EN</button>
+        <button class="test-btn" onclick="runTest('Hello world', 'en', 'zh')">EN → ZH</button>
+      </div>
+    </div>
+    
+    <div class="card">
+      <label>Console Log</label>
+      <div id="log" class="log"></div>
+    </div>
+  </div>
+
+  <!-- ONNX Runtime WASM -->
+  <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.17.0/dist/ort.min.js"></script>
+  
+  <script type="module">
+    import { Small100OnnxTranslatorWeb } from './dist/esm/web.js';
+    
+    const statusEl = document.getElementById('status');
+    const translateBtn = document.getElementById('translateBtn');
+    const inputText = document.getElementById('inputText');
+    const srcLang = document.getElementById('srcLang');
+    const tgtLang = document.getElementById('tgtLang');
+    const resultBox = document.getElementById('resultBox');
+    const resultText = document.getElementById('resultText');
+    const resultTime = document.getElementById('resultTime');
+    const logEl = document.getElementById('log');
+    
+    let translator = null;
+    
+    // Override console.log to show in UI
+    const originalLog = console.log;
+    const originalWarn = console.warn;
+    const originalError = console.error;
+    
+    function addLog(msg, type = 'info') {
+      const time = new Date().toLocaleTimeString();
+      const entry = document.createElement('div');
+      entry.className = 'log-entry';
+      entry.innerHTML = `<span class="log-time">[${time}]</span> <span class="log-${type}">${msg}</span>`;
+      logEl.appendChild(entry);
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+    
+    console.log = (...args) => { originalLog(...args); addLog(args.join(' '), 'info'); };
+    console.warn = (...args) => { originalWarn(...args); addLog(args.join(' '), 'info'); };
+    console.error = (...args) => { originalError(...args); addLog(args.join(' '), 'error'); };
+    
+    // Initialize translator
+    async function init() {
+      try {
+        addLog('Creating translator instance...', 'info');
+        translator = new Small100OnnxTranslatorWeb();
+        
+        addLog('Initializing (this may download models)...', 'info');
+        const info = await translator.initialize();
+        
+        addLog(`✓ Models loaded: ${info.version}`, 'success');
+        statusEl.className = 'status ready';
+        statusEl.textContent = `✅ Ready - Model version: ${info.version}`;
+        translateBtn.disabled = false;
+        
+        // Debug info
+        const debug = await translator.debugInfo();
+        addLog(`Encoder inputs: ${debug.encoderInputs.join(', ')}`, 'info');
+        addLog(`Decoder inputs: ${debug.decoderInputs.join(', ')}`, 'info');
+        
+      } catch (error) {
+        addLog(`✗ Error: ${error.message}`, 'error');
+        statusEl.className = 'status error';
+        statusEl.textContent = `❌ Error: ${error.message}`;
+      }
+    }
+    
+    // Translate function
+    async function translate() {
+      if (!translator) return;
+      
+      const text = inputText.value.trim();
+      if (!text) {
+        addLog('Please enter text to translate', 'error');
+        return;
+      }
+      
+      translateBtn.disabled = true;
+      resultBox.style.display = 'none';
+      
+      try {
+        const start = performance.now();
+        addLog(`Translating: "${text}" (${srcLang.value} → ${tgtLang.value})...`, 'info');
+        
+        const result = await translator.translate({
+          text,
+          sourceLanguage: srcLang.value,
+          targetLanguage: tgtLang.value
+        });
+        
+        const elapsed = (performance.now() - start).toFixed(0);
+        
+        addLog(`✓ Result: "${result.translatedText}" (${elapsed}ms)`, 'success');
+        
+        resultText.textContent = result.translatedText;
+        resultTime.textContent = `Translated in ${elapsed}ms`;
+        resultBox.style.display = 'block';
+        
+      } catch (error) {
+        addLog(`✗ Translation error: ${error.message}`, 'error');
+      } finally {
+        translateBtn.disabled = false;
+      }
+    }
+    
+    // Quick test function
+    window.runTest = async function(text, src, tgt) {
+      inputText.value = text;
+      srcLang.value = src;
+      tgtLang.value = tgt;
+      await translate();
+    };
+    
+    translateBtn.addEventListener('click', translate);
+    
+    // Allow Enter key in textarea with Ctrl
+    inputText.addEventListener('keydown', (e) => {
+      if (e.ctrlKey && e.key === 'Enter') {
+        translate();
+      }
+    });
+    
+    // Start initialization
+    init();
+  </script>
+</body>
+</html>
