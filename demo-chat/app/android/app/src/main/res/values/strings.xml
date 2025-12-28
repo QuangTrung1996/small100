@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Translation Chat</string>
+    <string name="title_activity_main">Translation Chat</string>
+    <string name="package_name">com.small100onnx.demochat</string>
+    <string name="custom_url_scheme">com.small100onnx.demochat</string>
+</resources>
