@@ -1,0 +1,7 @@
+platform :ios, '12.0'
+
+target 'Plugin' do
+  pod 'Capacitor', :path => '../../node_modules/@capacitor/ios'
+  pod 'CapacitorCordova', :path => '../../node_modules/@capacitor/ios'
+  pod 'onnxruntime-mobile', '~> 1.17'
+end

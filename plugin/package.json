@@ -1,0 +1,58 @@
+{
+  "name": "small100-onnx-translator",
+  "version": "1.0.0",
+  "description": "Capacitor plugin for offline translation using ONNX models",
+  "main": "dist/plugin.cjs.js",
+  "module": "dist/esm/index.js",
+  "types": "dist/esm/index.d.ts",
+  "unpkg": "dist/plugin.js",
+  "files": [
+    "android/src/main/java/com/small100onnx/Small100OnnxTranslator.java",
+    "ios/Plugin/Small100OnnxTranslatorPlugin.swift",
+    "dist/"
+  ],
+  "scripts": {
+    "build": "npm run clean && tsc && rollup -c rollup.config.js",
+    "clean": "rimraf ./dist",
+    "watch": "tsc --watch",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "capacitor",
+    "plugin",
+    "onnx",
+    "translation",
+    "offline"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@huggingface/transformers": "^3.8.1",
+    "@xenova/transformers": "^2.17.2",
+    "onnxruntime-web": "^1.18.0"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^5.0.0",
+    "@capacitor/core": "^5.0.0",
+    "@rollup/plugin-commonjs": "^25.0.0",
+    "@rollup/plugin-node-resolve": "^16.0.3",
+    "@types/node": "^18.0.0",
+    "rimraf": "^4.0.0",
+    "rollup": "^3.0.0",
+    "typescript": "~4.8.0"
+  },
+  "peerDependencies": {
+    "@capacitor/core": "^5.0.0"
+  },
+  "capacitor": {
+    "ios": {
+      "src": "ios/Plugin"
+    },
+    "android": {
+      "src": "android/src/main/java/com/small100onnx"
+    },
+    "web": {
+      "src": "web/src"
+    }
+  }
+}

@@ -1,0 +1,25 @@
+plugins {
+    id "com.android.library" version "8.1.0"
+}
+
+android {
+    compileSdkVersion 33
+    
+    defaultConfig {
+        minSdkVersion 21
+        targetSdkVersion 33
+        versionCode 1
+        versionName "1.0.0"
+    }
+    
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_11
+        targetCompatibility JavaVersion.VERSION_11
+    }
+}
+
+dependencies {
+    implementation "androidx.appcompat:appcompat:1.6.1"
+    implementation "com.getcapacitor:android:5.0.0"
+    implementation "ai.onnxruntime:onnxruntime-android:1.18.0"
+}

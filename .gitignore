@@ -1,0 +1,78 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+build/
+*.js.map
+*.d.ts
+!src/**/*.d.ts
+
+# Plugin build
+plugin/dist/
+plugin/build/
+
+# Demo build
+demo-web/dist/
+demo-web/node_modules/
+
+# Android
+plugin/android/.gradle/
+plugin/android/build/
+plugin/android/local.properties
+plugin/android/.idea/
+plugin/android/*.iml
+plugin/android/captures/
+plugin/android/.externalNativeBuild/
+plugin/android/.cxx/
+
+# iOS
+plugin/ios/Pods/
+plugin/ios/Podfile.lock
+plugin/ios/.build/
+plugin/ios/DerivedData/
+plugin/ios/*.xcworkspace
+plugin/ios/*.xcodeproj/xcuserdata/
+plugin/ios/*.xcodeproj/project.xcworkspace/
+
+# ONNX model files (download at runtime)
+*.onnx
+*.bpe.model
+models/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Temp files
+*.tmp
+*.temp
+temp/
+tmp/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Coverage
+coverage/
+
+# Cache
+.cache/
+.parcel-cache/
+.eslintcache
