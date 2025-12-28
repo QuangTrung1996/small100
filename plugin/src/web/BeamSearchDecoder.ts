@@ -19,7 +19,9 @@ export interface Beam {
   finished: boolean;
 }
 
-export type GetNextLogitsCallback = (inputIds: number[][]) => Promise<Float32Array[]>;
+export type GetNextLogitsCallback = (
+  inputIds: number[][]
+) => Promise<Float32Array[]>;
 
 export class BeamSearchDecoder {
   private config: BeamSearchConfig;
@@ -46,19 +48,21 @@ export class BeamSearchDecoder {
     const { numBeams, maxLength, eosTokenId, padTokenId } = this.config;
 
     // Initialize beams
-    let beams: Beam[] = [{
-      tokenIds: [...initialTokenIds],
-      score: 0.0,
-      finished: false,
-    }];
+    let beams: Beam[] = [
+      {
+        tokenIds: [...initialTokenIds],
+        score: 0.0,
+        finished: false,
+      },
+    ];
 
     // Expand to numBeams on first step
     for (let step = 0; step < maxLength; step++) {
-      const activeBeams = beams.filter(b => !b.finished);
+      const activeBeams = beams.filter((b) => !b.finished);
       if (activeBeams.length === 0) break;
 
       // Get input sequences
-      const inputBatch = activeBeams.map(b => b.tokenIds);
+      const inputBatch = activeBeams.map((b) => b.tokenIds);
       const logitsBatch = await getNextLogits(inputBatch);
 
       // Collect all candidates
@@ -89,14 +93,16 @@ export class BeamSearchDecoder {
 
           candidates.push({
             tokenIds: newTokenIds,
-            score: isFinished ? this.applyLengthPenalty(newScore, newTokenIds.length) : newScore,
+            score: isFinished
+              ? this.applyLengthPenalty(newScore, newTokenIds.length)
+              : newScore,
             finished: isFinished,
           });
         }
       }
 
       // Keep finished beams
-      const finishedBeams = beams.filter(b => b.finished);
+      const finishedBeams = beams.filter((b) => b.finished);
 
       // Select top beams
       candidates.sort((a, b) => b.score - a.score);
@@ -105,7 +111,7 @@ export class BeamSearchDecoder {
         .slice(0, numBeams);
 
       // Early stopping if all beams are finished
-      if (beams.every(b => b.finished)) break;
+      if (beams.every((b) => b.finished)) break;
     }
 
     // Return best beam (excluding special tokens at the end)
@@ -114,12 +120,15 @@ export class BeamSearchDecoder {
     let result = best.tokenIds.slice(initialTokenIds.length);
 
     // Remove EOS and PAD tokens
-    result = result.filter(id => id !== eosTokenId && id !== padTokenId);
+    result = result.filter((id) => id !== eosTokenId && id !== padTokenId);
 
     return result;
   }
 
-  private applyRepetitionPenalty(logits: Float32Array, previousTokens: number[]): void {
+  private applyRepetitionPenalty(
+    logits: Float32Array,
+    previousTokens: number[]
+  ): void {
     const { repetitionPenalty } = this.config;
     const seen = new Set(previousTokens);
 
@@ -134,19 +143,25 @@ export class BeamSearchDecoder {
     }
   }
 
-  private applyNgramBlocking(logits: Float32Array, previousTokens: number[], vocabSize: number): void {
+  private applyNgramBlocking(
+    logits: Float32Array,
+    previousTokens: number[],
+    vocabSize: number
+  ): void {
     const { noRepeatNgramSize } = this.config;
-    if (noRepeatNgramSize <= 0 || previousTokens.length < noRepeatNgramSize - 1) return;
+    if (noRepeatNgramSize <= 0 || previousTokens.length < noRepeatNgramSize - 1)
+      return;
 
     // Build n-gram history
     const ngrams = new Set<string>();
     for (let i = 0; i <= previousTokens.length - noRepeatNgramSize; i++) {
-      const ngram = previousTokens.slice(i, i + noRepeatNgramSize).join(',');
+      const ngram = previousTokens.slice(i, i + noRepeatNgramSize).join(",");
       ngrams.add(ngram);
     }
 
     // Get current prefix
-    const prefix = previousTokens.slice(-(noRepeatNgramSize - 1)).join(',') + ',';
+    const prefix =
+      previousTokens.slice(-(noRepeatNgramSize - 1)).join(",") + ",";
 
     // Block tokens that would complete a repeated n-gram
     for (let token = 0; token < vocabSize; token++) {
@@ -162,7 +177,14 @@ export class BeamSearchDecoder {
   }
 
   private softmax(logits: Float32Array): Float32Array {
-    const maxLogit = Math.max(...logits);
+    // Find max without spread operator (avoid stack overflow with large arrays)
+    let maxLogit = -Infinity;
+    for (let i = 0; i < logits.length; i++) {
+      if (logits[i] > maxLogit) {
+        maxLogit = logits[i];
+      }
+    }
+
     const exps = new Float32Array(logits.length);
     let sumExp = 0;
 
@@ -178,12 +200,29 @@ export class BeamSearchDecoder {
     return exps;
   }
 
-  private getTopK(probs: Float32Array, k: number): Array<{ index: number; prob: number }> {
-    const indexed = Array.from(probs)
-      .map((prob, index) => ({ index, prob }))
-      .filter(({ prob }) => isFinite(prob) && prob > 0);
+  private getTopK(
+    probs: Float32Array,
+    k: number
+  ): Array<{ index: number; prob: number }> {
+    // Use a more efficient approach for large arrays
+    // Maintain a min-heap of size k for better performance
+    const result: Array<{ index: number; prob: number }> = [];
 
-    indexed.sort((a, b) => b.prob - a.prob);
-    return indexed.slice(0, k);
+    for (let i = 0; i < probs.length; i++) {
+      const prob = probs[i];
+      if (!isFinite(prob) || prob <= 0) continue;
+
+      if (result.length < k) {
+        result.push({ index: i, prob });
+        // Keep sorted in ascending order (min at front)
+        result.sort((a, b) => a.prob - b.prob);
+      } else if (prob > result[0].prob) {
+        result[0] = { index: i, prob };
+        result.sort((a, b) => a.prob - b.prob);
+      }
+    }
+
+    // Return in descending order
+    return result.reverse();
   }
 }

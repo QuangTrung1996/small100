@@ -22,11 +22,20 @@ export default function CreateRoomPage() {
   const [language, setLanguage] = useState(settings.language);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+  const [showDebug, setShowDebug] = useState(true);
+  const [debugLogs, setDebugLogs] = useState<string[]>([]);
+  const debugEndRef = useRef<HTMLDivElement>(null);
 
   // Use refs to access current values in callbacks
   const roomNameRef = useRef(roomName);
   const hostNameRef = useRef(hostName);
   const languageRef = useRef(language);
+
+  // Helper to add debug log
+  const addLog = useCallback((log: string) => {
+    const timestamp = new Date().toLocaleTimeString();
+    setDebugLogs((prev) => [...prev.slice(-50), `[${timestamp}] ${log}`]);
+  }, []);
 
   // Keep refs in sync
   useEffect(() => {
@@ -35,39 +44,58 @@ export default function CreateRoomPage() {
     languageRef.current = language;
   }, [roomName, hostName, language]);
 
+  // Log input changes
+  useEffect(() => {
+    addLog(`Room name: ${roomName}`);
+  }, [roomName]);
+  useEffect(() => {
+    addLog(`Host name: ${hostName}`);
+  }, [hostName]);
+  useEffect(() => {
+    addLog(`Language: ${language}`);
+  }, [language]);
+
+  // Scroll debug to bottom
+  useEffect(() => {
+    debugEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [debugLogs]);
+
   const handleMessage = useCallback(
     (message: import("../types").ServerMessage) => {
       if (isConnectedMessage(message)) {
+        addLog("🟢 Connected to server");
         setUserId(message.userId);
         setConnected(true);
-        // Use refs to get current values
         wsService.createRoom(
           roomNameRef.current,
           hostNameRef.current,
           languageRef.current
         );
       } else if (isRoomCreatedMessage(message)) {
+        addLog("🏠 Room created successfully");
         setRoom(message.room);
         setMembers(message.members);
         setIsLoading(false);
         navigate(`/chat/${message.roomCode}`);
       } else if (isErrorMessage(message)) {
+        addLog(`❌ Error: ${message.message}`);
         setError(message.message);
         setIsLoading(false);
       }
     },
-    [navigate, setUserId, setConnected, setRoom, setMembers]
+    [navigate, setUserId, setConnected, setRoom, setMembers, addLog]
   );
 
   const handleConnectionChange = useCallback(
     (connected: boolean) => {
+      addLog(connected ? "🟢 Connected" : "🔴 Disconnected");
       setConnected(connected);
       if (!connected) {
         setIsLoading(false);
         setError("Connection lost. Please try again.");
       }
     },
-    [setConnected]
+    [setConnected, addLog]
   );
 
   useEffect(() => {
@@ -83,12 +111,15 @@ export default function CreateRoomPage() {
   }, [handleMessage, handleConnectionChange]);
 
   const handleCreate = async () => {
+    addLog("🔨 Create Room button clicked");
     if (!roomName.trim()) {
       setError("Please enter a room name");
+      addLog("⚠️ Missing room name");
       return;
     }
     if (!hostName.trim()) {
       setError("Please enter your name");
+      addLog("⚠️ Missing host name");
       return;
     }
 
@@ -97,10 +128,10 @@ export default function CreateRoomPage() {
     clearRoom();
 
     try {
-      // Connect to WebSocket server
+      addLog(`🌐 Connecting to ${settings.serverUrl}`);
       await wsService.connect(settings.serverUrl);
     } catch (err) {
-      console.error("Connection error:", err);
+      addLog("❌ Connection error");
       setError("Failed to connect to server. Make sure the server is running.");
       setIsLoading(false);
     }
@@ -159,6 +190,48 @@ export default function CreateRoomPage() {
           Create Room
         </Button>
       </div>
+
+      {/* Debug Panel */}
+      {showDebug && (
+        <div className="bg-gray-900 text-green-400 text-xs font-mono max-h-40 overflow-auto p-2 border-t border-gray-700">
+          <div className="flex justify-between items-center mb-1">
+            <span className="text-yellow-400 font-bold">🔧 Debug Log</span>
+            <div>
+              <button
+                onClick={() => setDebugLogs([])}
+                className="text-gray-400 hover:text-white px-2 mr-1 border border-gray-700 rounded"
+                title="Clear log"
+              >
+                🧹
+              </button>
+              <button
+                onClick={() => setShowDebug(false)}
+                className="text-gray-500 hover:text-white px-2"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+          {debugLogs.length === 0 ? (
+            <p className="text-gray-500">No logs yet...</p>
+          ) : (
+            debugLogs.map((log, i) => (
+              <p key={i} className="leading-tight">
+                {log}
+              </p>
+            ))
+          )}
+          <div ref={debugEndRef} />
+        </div>
+      )}
+      {!showDebug && (
+        <button
+          onClick={() => setShowDebug(true)}
+          className="fixed bottom-20 right-4 bg-gray-800 text-white px-3 py-1 rounded-full text-xs shadow-lg"
+        >
+          🔧 Debug
+        </button>
+      )}
     </div>
   );
 }

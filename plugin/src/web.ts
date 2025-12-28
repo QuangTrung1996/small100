@@ -1,15 +1,16 @@
-import { WebPlugin } from '@capacitor/core';
+import { WebPlugin } from "@capacitor/core";
 import type {
   Small100OnnxTranslatorPlugin,
   ModelInfo,
   TranslateOptions,
   TranslateResult,
-} from './definitions';
-import { Translator } from './web/Translator';
+} from "./definitions";
+import { Translator } from "./web/Translator";
 
-const HUGGINGFACE_BASE = 'https://huggingface.co/lyphanthuc/small100-onnx/resolve/main';
-const DB_NAME = 'Small100OnnxDB';
-const STORE_NAME = 'models';
+const HUGGINGFACE_BASE =
+  "https://huggingface.co/lyphanthuc/small100-onnx/resolve/main";
+const DB_NAME = "Small100OnnxDB";
+const STORE_NAME = "models";
 
 declare const ort: any;
 
@@ -19,22 +20,25 @@ function configureOrt(): void {
   if (ortConfigured) return;
   ortConfigured = true;
   try {
-    if (typeof ort !== 'undefined' && ort.env?.wasm) {
+    if (typeof ort !== "undefined" && ort.env?.wasm) {
       ort.env.wasm.numThreads = 1;
       ort.env.wasm.simd = true;
-      console.log('[ONNX] Configured for WASM backend');
+      console.log("[ONNX] Configured for WASM backend");
     }
   } catch (e) {
-    console.warn('[ONNX] Configuration warning:', e);
+    console.warn("[ONNX] Configuration warning:", e);
   }
 }
 
 /**
  * Capacitor Plugin for SMALL100 ONNX Translation (Web)
  */
-export class Small100OnnxTranslatorWeb extends WebPlugin implements Small100OnnxTranslatorPlugin {
+export class Small100OnnxTranslatorWeb
+  extends WebPlugin
+  implements Small100OnnxTranslatorPlugin
+{
   private db: IDBDatabase | null = null;
-  private modelInfo: ModelInfo = { version: '' };
+  private modelInfo: ModelInfo = { version: "" };
   private translator: Translator | null = null;
 
   async initialize(): Promise<ModelInfo> {
@@ -49,7 +53,7 @@ export class Small100OnnxTranslatorWeb extends WebPlugin implements Small100Onnx
       return existing;
     }
 
-    console.log('[Init] No models found, downloading...');
+    console.log("[Init] No models found, downloading...");
     return this.downloadModels();
   }
 
@@ -62,32 +66,45 @@ export class Small100OnnxTranslatorWeb extends WebPlugin implements Small100Onnx
     configureOrt();
 
     // Fetch version
+    console.log("[Download] Fetching version...");
     const versionResponse = await fetch(`${HUGGINGFACE_BASE}/version.txt`);
     const version = (await versionResponse.text()).trim();
+    console.log(`[Download] ✓ Version: ${version}`);
 
     const files = [
-      'added_tokens.json',
-      'decoder_int8.onnx',
-      'encoder_int8.onnx',
-      'special_tokens_map.json',
-      'tokenizer_config.json',
-      'vocab.json',
+      "added_tokens.json",
+      "decoder_int8.onnx",
+      "encoder_int8.onnx",
+      "special_tokens_map.json",
+      "tokenizer_config.json",
+      "vocab.json",
     ];
 
     const modelDir = `${HUGGINGFACE_BASE}/${version}`;
     const downloadedFiles: Record<string, ArrayBuffer> = {};
 
-    console.log(`[Download] Version: ${version}`);
+    console.log(
+      `[Download] Downloading ${files.length} files from ${version}...`
+    );
 
-    for (const file of files) {
-      console.log(`[Download] ${file}`);
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const progress = Math.round(((i + 1) / files.length) * 100);
+      console.log(`[Download] (${i + 1}/${files.length}) ${file}...`);
+
       const response = await fetch(`${modelDir}/${file}`);
       if (!response.ok) throw new Error(`Failed to download ${file}`);
       downloadedFiles[file] = await response.arrayBuffer();
+
+      console.log(`[Download] ✓ ${file} - ${progress}% complete`);
     }
 
+    console.log("[Download] All files downloaded, saving to IndexedDB...");
     await this.saveModels(downloadedFiles, version);
+
+    console.log("[Download] Initializing translator...");
     await this.initTranslator();
+    console.log("[Download] ✓ Translator ready!");
 
     this.modelInfo = {
       version,
@@ -99,14 +116,17 @@ export class Small100OnnxTranslatorWeb extends WebPlugin implements Small100Onnx
   }
 
   async translate(options: TranslateOptions): Promise<TranslateResult> {
-    const { text, sourceLanguage = 'auto', targetLanguage = 'en' } = options;
+    const { text, sourceLanguage = "auto", targetLanguage = "en" } = options;
 
     if (!this.translator) {
-      throw new Error('Translator not initialized. Call initialize() first.');
+      throw new Error("Translator not initialized. Call initialize() first.");
     }
 
-    const srcLang = sourceLanguage === 'auto' ? 'en' : sourceLanguage;
-    const translatedText = await this.translator.translate(text, targetLanguage);
+    const srcLang = sourceLanguage === "auto" ? "en" : sourceLanguage;
+    const translatedText = await this.translator.translate(
+      text,
+      targetLanguage
+    );
 
     return {
       translatedText,
@@ -126,10 +146,10 @@ export class Small100OnnxTranslatorWeb extends WebPlugin implements Small100Onnx
         return stored;
       }
     } catch (error) {
-      console.error('Failed to load model info:', error);
+      console.error("Failed to load model info:", error);
     }
 
-    return { version: '' };
+    return { version: "" };
   }
 
   async clearModels(): Promise<void> {
@@ -139,7 +159,7 @@ export class Small100OnnxTranslatorWeb extends WebPlugin implements Small100Onnx
     }
 
     if (this.db) {
-      const transaction = this.db.transaction([STORE_NAME], 'readwrite');
+      const transaction = this.db.transaction([STORE_NAME], "readwrite");
       const store = transaction.objectStore(STORE_NAME);
       await new Promise<void>((resolve, reject) => {
         const request = store.clear();
@@ -148,7 +168,7 @@ export class Small100OnnxTranslatorWeb extends WebPlugin implements Small100Onnx
       });
     }
 
-    this.modelInfo = { version: '' };
+    this.modelInfo = { version: "" };
   }
 
   async debugInfo(): Promise<{
@@ -158,7 +178,12 @@ export class Small100OnnxTranslatorWeb extends WebPlugin implements Small100Onnx
     decoderOutputs: string[];
   }> {
     if (!this.translator) {
-      return { encoderInputs: [], encoderOutputs: [], decoderInputs: [], decoderOutputs: [] };
+      return {
+        encoderInputs: [],
+        encoderOutputs: [],
+        decoderInputs: [],
+        decoderOutputs: [],
+      };
     }
 
     const engine = this.translator.translationEngine;
@@ -175,16 +200,21 @@ export class Small100OnnxTranslatorWeb extends WebPlugin implements Small100Onnx
   private async initTranslator(): Promise<void> {
     configureOrt();
 
-    const encoder = await this.getModelBlob('model_encoder_int8.onnx');
-    const decoder = await this.getModelBlob('model_decoder_int8.onnx');
-    const vocab = await this.getJSON('model_vocab.json');
-    const addedTokens = await this.getJSON('model_added_tokens.json');
+    const encoder = await this.getModelBlob("model_encoder_int8.onnx");
+    const decoder = await this.getModelBlob("model_decoder_int8.onnx");
+    const vocab = await this.getJSON("model_vocab.json");
+    const addedTokens = await this.getJSON("model_added_tokens.json");
 
     if (!encoder || !decoder || !vocab || !addedTokens) {
-      throw new Error('Model files not found. Call downloadModels() first.');
+      throw new Error("Model files not found. Call downloadModels() first.");
     }
 
-    this.translator = await Translator.create(encoder, decoder, vocab, addedTokens);
+    this.translator = await Translator.create(
+      encoder,
+      decoder,
+      vocab,
+      addedTokens
+    );
   }
 
   private async initDB(): Promise<void> {
@@ -206,17 +236,23 @@ export class Small100OnnxTranslatorWeb extends WebPlugin implements Small100Onnx
     });
   }
 
-  private async saveModels(files: Record<string, ArrayBuffer>, version: string): Promise<void> {
+  private async saveModels(
+    files: Record<string, ArrayBuffer>,
+    version: string
+  ): Promise<void> {
     if (!this.db) return;
 
-    const transaction = this.db.transaction([STORE_NAME], 'readwrite');
+    const transaction = this.db.transaction([STORE_NAME], "readwrite");
     const store = transaction.objectStore(STORE_NAME);
 
     return new Promise((resolve, reject) => {
       for (const [filename, data] of Object.entries(files)) {
         store.put(data, `model_${filename}`);
       }
-      store.put({ version, downloadedAt: new Date().toISOString() }, 'metadata');
+      store.put(
+        { version, downloadedAt: new Date().toISOString() },
+        "metadata"
+      );
 
       transaction.oncomplete = () => resolve();
       transaction.onerror = () => reject(transaction.error);
@@ -226,11 +262,11 @@ export class Small100OnnxTranslatorWeb extends WebPlugin implements Small100Onnx
   private async getStoredModelInfo(): Promise<ModelInfo | null> {
     if (!this.db) return null;
 
-    const transaction = this.db.transaction([STORE_NAME], 'readonly');
+    const transaction = this.db.transaction([STORE_NAME], "readonly");
     const store = transaction.objectStore(STORE_NAME);
 
     return new Promise((resolve, reject) => {
-      const request = store.get('metadata');
+      const request = store.get("metadata");
       request.onsuccess = () => {
         const metadata = request.result;
         if (metadata) {
@@ -250,7 +286,7 @@ export class Small100OnnxTranslatorWeb extends WebPlugin implements Small100Onnx
   private async getModelBlob(key: string): Promise<ArrayBuffer | null> {
     if (!this.db) return null;
 
-    const transaction = this.db.transaction([STORE_NAME], 'readonly');
+    const transaction = this.db.transaction([STORE_NAME], "readonly");
     const store = transaction.objectStore(STORE_NAME);
 
     return new Promise((resolve, reject) => {
@@ -273,7 +309,7 @@ export class Small100OnnxTranslatorWeb extends WebPlugin implements Small100Onnx
 }
 
 // Re-export web modules for direct usage
-export { SimpleBPETokenizer } from './web/SimpleBPETokenizer';
-export { BeamSearchDecoder } from './web/BeamSearchDecoder';
-export { TranslationEngine } from './web/TranslationEngine';
-export { Translator } from './web/Translator';
+export { SimpleBPETokenizer } from "./web/SimpleBPETokenizer";
+export { BeamSearchDecoder } from "./web/BeamSearchDecoder";
+export { TranslationEngine } from "./web/TranslationEngine";
+export { Translator } from "./web/Translator";

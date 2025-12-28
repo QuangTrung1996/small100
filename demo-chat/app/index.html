@@ -3,12 +3,24 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    />
     <meta name="theme-color" content="#3b82f6" />
     <title>Translation Chat</title>
   </head>
   <body>
     <div id="root"></div>
+    <!-- Load ONNX Runtime from CDN before app -->
+    <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.17.0/dist/ort.min.js"></script>
+    <script>
+      // Configure ONNX Runtime WASM paths
+      if (typeof ort !== "undefined") {
+        ort.env.wasm.wasmPaths = "/onnx-wasm/";
+        ort.env.wasm.numThreads = 1;
+      }
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

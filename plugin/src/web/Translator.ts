@@ -3,9 +3,9 @@
  * Coordinates tokenizer, engine, and decoder
  */
 
-import { SimpleBPETokenizer } from './SimpleBPETokenizer';
-import { BeamSearchDecoder, BeamSearchConfig } from './BeamSearchDecoder';
-import { TranslationEngine } from './TranslationEngine';
+import { SimpleBPETokenizer } from "./SimpleBPETokenizer";
+import { BeamSearchDecoder, BeamSearchConfig } from "./BeamSearchDecoder";
+import { TranslationEngine } from "./TranslationEngine";
 
 export interface TranslatorConfig extends Partial<BeamSearchConfig> {
   logSteps?: boolean;
@@ -59,8 +59,25 @@ export class Translator {
 
     // Build language token map
     const languageTokenMap = new Map<string, number>();
-    for (const token of addedTokens) {
-      const match = token.content.match(/^__(\w+)__$/);
+
+    // Handle different formats of addedTokens
+    let tokenArray: Array<{ id: number; content: string }> = [];
+
+    if (Array.isArray(addedTokens)) {
+      tokenArray = addedTokens;
+    } else if (addedTokens && typeof addedTokens === "object") {
+      // If it's an object with content/id keys, convert to array
+      tokenArray = Object.entries(addedTokens).map(([content, id]) => ({
+        content,
+        id: typeof id === "number" ? id : parseInt(id as string, 10),
+      }));
+    }
+
+    console.log(`[Translator] Processing ${tokenArray.length} added tokens`);
+
+    for (const token of tokenArray) {
+      const content = token.content || (token as any).key || "";
+      const match = content.match(/^__(\w+)__$/);
       if (match) {
         languageTokenMap.set(match[1], token.id);
       }
@@ -103,16 +120,17 @@ export class Translator {
     const initialIds = [this.tokenizer.eosTokenId, langTokenId];
 
     // Run beam search
-    const outputIds = await this.decoder.decode(
-      initialIds,
-      (batch) => this.engine.getNextLogits(batch)
+    const outputIds = await this.decoder.decode(initialIds, (batch) =>
+      this.engine.getNextLogits(batch)
     );
 
     // Decode output
     const result = this.tokenizer.decode(outputIds);
 
     const elapsed = performance.now() - startTime;
-    console.log(`[Translate] Completed in ${elapsed.toFixed(0)}ms: "${result}"`);
+    console.log(
+      `[Translate] Completed in ${elapsed.toFixed(0)}ms: "${result}"`
+    );
 
     return result;
   }

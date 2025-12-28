@@ -1,18 +1,23 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import { useAppStore } from '../store/appStore';
+import { useState, useEffect, useRef, useCallback } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import { useAppStore } from "../store/appStore";
 import {
   wsService,
   isNewMessageMessage,
   isUserJoinedMessage,
   isUserLeftMessage,
   isErrorMessage,
-} from '../services/websocketService';
-import Header from '../components/Header';
-import Button from '../components/Button';
-import MessageBubble from '../components/MessageBubble';
-import MembersList from '../components/MembersList';
-import { SendIcon, UsersIcon, ClipboardIcon, CheckIcon } from '../components/icons';
+} from "../services/websocketService";
+import Header from "../components/Header";
+import Button from "../components/Button";
+import MessageBubble from "../components/MessageBubble";
+import MembersList from "../components/MembersList";
+import {
+  SendIcon,
+  UsersIcon,
+  ClipboardIcon,
+  CheckIcon,
+} from "../components/icons";
 
 export default function ChatRoomPage() {
   const navigate = useNavigate();
@@ -31,15 +36,29 @@ export default function ChatRoomPage() {
     translateMessage,
   } = useAppStore();
 
-  const [inputText, setInputText] = useState('');
+  const [inputText, setInputText] = useState("");
   const [showMembers, setShowMembers] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [showDebug, setShowDebug] = useState(true);
+  const [debugLogs, setDebugLogs] = useState<string[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const debugEndRef = useRef<HTMLDivElement>(null);
+
+  // Add debug log helper
+  const addLog = useCallback((log: string) => {
+    const timestamp = new Date().toLocaleTimeString();
+    setDebugLogs((prev) => [...prev.slice(-50), `[${timestamp}] ${log}`]);
+  }, []);
+
+  // Scroll debug to bottom
+  useEffect(() => {
+    debugEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [debugLogs]);
 
   // Scroll to bottom on new messages
   const scrollToBottom = useCallback(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, []);
 
   useEffect(() => {
@@ -48,34 +67,56 @@ export default function ChatRoomPage() {
 
   // Handle incoming messages
   useEffect(() => {
+    addLog(`My language: ${settings.language}`);
+
     const unsubscribe = wsService.onMessage(async (message) => {
       if (isNewMessageMessage(message)) {
         const newMessage = message.message;
-        
+
+        // Debug log
+        addLog(`📩 Received: "${newMessage.text}"`);
+        addLog(`   From: ${newMessage.senderName} (${newMessage.sourceLang})`);
+        addLog(`   My lang: ${settings.language}`);
+        addLog(
+          `   Need translate: ${newMessage.sourceLang !== settings.language}`
+        );
+
         // Translate if different language
         if (newMessage.sourceLang !== settings.language) {
-          const translated = await translateMessage(newMessage.text, newMessage.sourceLang);
+          addLog(
+            `🔄 Translating ${newMessage.sourceLang} → ${settings.language}...`
+          );
+          const translated = await translateMessage(
+            newMessage.text,
+            newMessage.sourceLang
+          );
+          addLog(`✅ Result: "${translated}"`);
           addMessage({ ...newMessage, translatedText: translated });
         } else {
+          addLog(`⏭️ Same language, skip translation`);
           addMessage(newMessage);
         }
       } else if (isUserJoinedMessage(message)) {
+        addLog(
+          `👤 User joined: ${message.user.name} (${message.user.language})`
+        );
         if (message.isUpdate) {
           updateMember(message.user);
         } else {
           addMember(message.user);
         }
       } else if (isUserLeftMessage(message)) {
+        addLog(`👋 User left: ${message.userId}`);
         removeMember(message.userId);
       } else if (isErrorMessage(message)) {
-        console.error('Error:', message.message);
+        addLog(`❌ Error: ${message.message}`);
       }
     });
 
     const unsubscribeConnection = wsService.onConnectionChange((connected) => {
       if (!connected) {
         // Connection lost
-        navigate('/');
+        navigate("/");
       }
     });
 
@@ -83,19 +124,28 @@ export default function ChatRoomPage() {
       unsubscribe();
       unsubscribeConnection();
     };
-  }, [settings.language, addMessage, addMember, removeMember, updateMember, translateMessage, navigate]);
+  }, [
+    settings.language,
+    addMessage,
+    addMember,
+    removeMember,
+    updateMember,
+    translateMessage,
+    navigate,
+    addLog,
+  ]);
 
   const handleSend = () => {
     const text = inputText.trim();
     if (!text) return;
 
     wsService.sendMessage(text);
-    setInputText('');
+    setInputText("");
     inputRef.current?.focus();
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSend();
     }
@@ -105,7 +155,7 @@ export default function ChatRoomPage() {
     wsService.leaveRoom();
     wsService.disconnect();
     clearRoom();
-    navigate('/');
+    navigate("/");
   };
 
   const copyRoomCode = async () => {
@@ -115,6 +165,9 @@ export default function ChatRoomPage() {
       setTimeout(() => setCopied(false), 2000);
     }
   };
+
+  // Get language display name
+  const myLangDisplay = settings.language.toUpperCase();
 
   if (!currentRoom) {
     return (
@@ -128,7 +181,7 @@ export default function ChatRoomPage() {
     <div className="h-full flex flex-col">
       {/* Header */}
       <Header
-        title={currentRoom.name}
+        title={`${currentRoom.name} (${myLangDisplay})`}
         showBack
         onBack={handleLeave}
         rightContent={
@@ -162,7 +215,7 @@ export default function ChatRoomPage() {
       {showMembers && (
         <MembersList
           members={members}
-          currentUserId={userId || ''}
+          currentUserId={userId || ""}
           onClose={() => setShowMembers(false)}
         />
       )}
@@ -206,6 +259,50 @@ export default function ChatRoomPage() {
           <SendIcon className="w-5 h-5" />
         </Button>
       </div>
+
+      {/* Debug Panel */}
+      {showDebug && (
+        <div className="bg-gray-900 text-green-400 text-xs font-mono max-h-40 overflow-auto p-2 border-t border-gray-700">
+          <div className="flex justify-between items-center mb-1">
+            <span className="text-yellow-400 font-bold">🔧 Debug Log</span>
+            <div>
+              <button
+                onClick={() => setDebugLogs([])}
+                className="text-gray-400 hover:text-white px-2 mr-1 border border-gray-700 rounded"
+                title="Clear log"
+              >
+                🧹
+              </button>
+              <button
+                onClick={() => setShowDebug(false)}
+                className="text-gray-500 hover:text-white px-2"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+          {debugLogs.length === 0 ? (
+            <p className="text-gray-500">No logs yet...</p>
+          ) : (
+            debugLogs.map((log, i) => (
+              <p key={i} className="leading-tight">
+                {log}
+              </p>
+            ))
+          )}
+          <div ref={debugEndRef} />
+        </div>
+      )}
+
+      {/* Show Debug Button */}
+      {!showDebug && (
+        <button
+          onClick={() => setShowDebug(true)}
+          className="fixed bottom-20 right-4 bg-gray-800 text-white px-3 py-1 rounded-full text-xs shadow-lg"
+        >
+          🔧 Debug
+        </button>
+      )}
     </div>
   );
 }

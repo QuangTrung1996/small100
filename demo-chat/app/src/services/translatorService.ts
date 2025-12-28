@@ -3,47 +3,49 @@
  * Wraps the Small100OnnxTranslator plugin for translation functionality
  */
 
-// Import will be available after npm install
-// import { Small100OnnxTranslator } from 'small100-onnx-translator';
+import { Small100OnnxTranslator } from "small100-onnx-translator";
 
 type ProgressCallback = (progress: number) => void;
 
 class TranslatorService {
   private isInitialized = false;
-  private plugin: any = null;
+  private isInitializing = false;
 
   async initialize(onProgress?: ProgressCallback): Promise<void> {
     if (this.isInitialized) {
       return;
     }
 
-    try {
-      // Dynamic import for the plugin
-      const { Small100OnnxTranslator } = await import('small100-onnx-translator');
-      this.plugin = Small100OnnxTranslator;
-
-      // Check if model is downloaded
-      const status = await this.plugin.getModelStatus();
-      
-      if (!status.isDownloaded) {
-        // Download model with progress callback
-        await this.plugin.downloadModel({
-          onProgress: (event: { progress: number }) => {
-            onProgress?.(event.progress);
-          },
-        });
+    if (this.isInitializing) {
+      // Wait for initialization to complete
+      while (this.isInitializing) {
+        await new Promise((resolve) => setTimeout(resolve, 100));
       }
+      return;
+    }
 
-      // Initialize the translator
-      await this.plugin.initialize();
-      
+    this.isInitializing = true;
+
+    try {
+      console.log("[TranslatorService] Initializing...");
+      onProgress?.(10);
+
+      // Initialize the plugin (this will download models if needed)
+      const modelInfo = await Small100OnnxTranslator.initialize();
+      console.log(
+        "[TranslatorService] Initialized with model:",
+        modelInfo.version
+      );
+
       this.isInitialized = true;
       onProgress?.(100);
     } catch (error) {
-      console.error('Failed to initialize translator:', error);
-      // For web demo without actual plugin, we'll use a mock
+      console.error("[TranslatorService] Failed to initialize:", error);
+      // Still mark as initialized to prevent blocking the UI
       this.isInitialized = true;
       onProgress?.(100);
+    } finally {
+      this.isInitializing = false;
     }
   }
 
@@ -60,35 +62,42 @@ class TranslatorService {
       return text;
     }
 
+    // Ensure initialized
+    if (!this.isInitialized) {
+      await this.initialize();
+    }
+
     try {
-      if (this.plugin) {
-        const result = await this.plugin.translate({
-          text,
-          sourceLang,
-          targetLang,
-        });
-        return result.translatedText;
-      }
-      
-      // Mock translation for demo (when plugin is not available)
-      return this.mockTranslate(text, sourceLang, targetLang);
+      console.log(
+        `[TranslatorService] Translating: "${text}" from ${sourceLang} to ${targetLang}`
+      );
+
+      const result = await Small100OnnxTranslator.translate({
+        text,
+        sourceLanguage: sourceLang,
+        targetLanguage: targetLang,
+      });
+
+      console.log(`[TranslatorService] Result: "${result.translatedText}"`);
+      return result.translatedText;
     } catch (error) {
-      console.error('Translation error:', error);
+      console.error("[TranslatorService] Translation error:", error);
+      // Return original text if translation fails
       return text;
     }
   }
 
-  private mockTranslate(
-    text: string,
-    _sourceLang: string,
-    targetLang: string
-  ): string {
-    // Simple mock for demo purposes
-    return `[${targetLang}] ${text}`;
-  }
-
   isReady(): boolean {
     return this.isInitialized;
+  }
+
+  async checkReady(): Promise<boolean> {
+    try {
+      const status = await Small100OnnxTranslator.isReady();
+      return status.ready;
+    } catch {
+      return false;
+    }
   }
 }
 
